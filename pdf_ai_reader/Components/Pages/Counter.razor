@@ -9,11 +9,35 @@
 
 <button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
 
+
+@if (currentCount > 3)
+{
+    <p>You win!</p>
+}
+
+<ul>
+    @foreach (var item in items)
+    {
+        <li>@item</li>
+    }
+</ul>
+
+
 @code {
     private int currentCount = 0;
 
+    [Parameter]
+    public int IncrementAmount { get; set; } = 2;
+
+
+    [Parameter]
+    public List<string>? items { get; set; } = new List<string>{ "One" };
+
     private void IncrementCount()
     {
-        currentCount++;
+        currentCount += IncrementAmount;
     }
+
+    
+
 }
