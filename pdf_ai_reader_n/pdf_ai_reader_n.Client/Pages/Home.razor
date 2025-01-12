@@ -1,5 +1,5 @@
 ﻿@page "/"
-@rendermode InteractiveServer
+@rendermode InteractiveWebAssembly
 
 @using System.IO
 @using System
@@ -9,10 +9,13 @@
 
 <h3>Upload and Convert PDF Page to Image</h3>
 
-<InputFile OnChange="HandleFileSelected" accept=".pdf" />
+<InputFile OnChange="HandleFileSelected" />
 <input type="number" @bind="PageNumber" min="1" />
+<button @onclick="ProcessFile" disabled="@(!IsFileSelected)">Upload and Convert</button>
 
-<button @onclick="ProcessFile" disabled="@(!IsFileSelected)">UConvert</button>
+<br/>
+
+client
 
 <br/>
 
