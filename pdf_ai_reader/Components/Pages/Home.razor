@@ -6,15 +6,16 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using System.Diagnostics;
 @using PdfiumViewer; // Make sure this is here
+@using System.Drawing.Imaging // Ensure this is present for ImageFormat
 
 <h3>Upload and Convert PDF Page to Image</h3>
 
 <InputFile OnChange="HandleFileSelected" accept=".pdf" />
-<input type="number" @bind="PageNumber" min="1" />
+<input type="number" @bind="PageNumber" min="1" @bind:after="ProcessFile" /> / @TotalPages
 
-<button @onclick="ProcessFile" disabled="@(!IsFileSelected)">UConvert</button>
 
-<br/>
+
+<br />
 
 @if (!string.IsNullOrEmpty(ImageData))
 {
@@ -26,37 +27,84 @@
     private int PageNumber = 1;
     private string? ImageData;
     private bool IsFileSelected => UploadedFile != null;
+    private int TotalPages = 0;
 
-    private void HandleFileSelected(InputFileChangeEventArgs e)
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
     {
         UploadedFile = e.File;
         Debug.WriteLine($"File selected: {UploadedFile?.Name ?? "No file"} ({UploadedFile?.Size ?? 0} bytes)");
+        await LoadPdfInfo();
     }
 
-    private async Task ProcessFile()
+    private async Task LoadPdfInfo()
     {
         if (UploadedFile == null)
         {
-            Debug.WriteLine("No file uploaded.");
-            return;
-        }
-
-        if (PageNumber <= 0)
-        {
-            Debug.WriteLine("Invalid page number.");
             return;
         }
 
         try
         {
             using var stream = UploadedFile.OpenReadStream(maxAllowedSize: long.MaxValue);
-
-            // Use MemoryStream to read all bytes reliably
             using var memoryStream = new MemoryStream();
             await stream.CopyToAsync(memoryStream);
             byte[] buffer = memoryStream.ToArray();
 
-            Debug.WriteLine($"Total bytes read into buffer: {buffer.Length} bytes");
+
+            memoryStream.Seek(0, SeekOrigin.Begin);
+
+            using var pdfDocument = PdfiumViewer.PdfDocument.Load(memoryStream);
+            TotalPages = pdfDocument.PageCount;
+            PageNumber = 1; // Set to the first page
+            await ProcessFile(); // Show the first page immediately
+        }
+        catch (PdfiumViewer.PdfException pdfEx)
+        {
+            Debug.WriteLine($"PdfiumViewer.PdfException in LoadPdfInfo: {pdfEx.Message}");
+            Debug.WriteLine($"StackTrace: {pdfEx.StackTrace}");
+            // Handle PDF specific errors here, perhaps show a message to the user
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"General Exception in LoadPdfInfo: {ex.Message}");
+            Debug.WriteLine($"StackTrace: {ex.StackTrace}");
+            // Handle other potential errors during file loading
+        }
+    }
+
+
+
+    private async Task ProcessFile()
+    {
+        
+        if (UploadedFile == null)
+        {
+            Debug.WriteLine("No file uploaded.");
+            return;
+        }
+
+        if (TotalPages == 0)
+        {
+            Debug.WriteLine("Total pages is 0, cannot process.");
+            return;
+        }
+
+        // Clamp logic for PageNumber
+        if (PageNumber > TotalPages)
+        {
+            PageNumber = TotalPages;
+        }
+        else if (PageNumber <= 0)
+        {
+            PageNumber = 1;
+        }
+
+        try
+        {
+            using var stream = UploadedFile.OpenReadStream(maxAllowedSize: long.MaxValue);
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+            byte[] buffer = memoryStream.ToArray();
 
             ImageData = await ConvertToImage(buffer, PageNumber);
         }
@@ -76,24 +124,20 @@
     {
         try
         {
-            Debug.WriteLine($"FileBytes Length inside ConvertFileToImage: {fileBytes.Length}");
             using var stream = new MemoryStream(fileBytes);
-            stream.Seek(0, SeekOrigin.Begin); // Reset the position - CRUCIAL
+            stream.Seek(0, SeekOrigin.Begin);
 
-            Debug.WriteLine($"Stream Length inside ConvertFileToImage: {stream.Length}");
-
-            using var pdfDocument = PdfiumViewer.PdfDocument.Load(stream); // The problematic line
-            Debug.WriteLine("PDF Document loaded successfully.");
+            using var pdfDocument = PdfiumViewer.PdfDocument.Load(stream);
 
             using var image = pdfDocument.Render(pageNumber - 1, 300, 300, PdfiumViewer.PdfRenderFlags.Annotations);
             using var memoryStream = new MemoryStream();
-            image.Save(memoryStream, System.Drawing.Imaging.ImageFormat.Png);
+            image.Save(memoryStream, ImageFormat.Png); // Ensure ImageFormat is accessible
             var base64Image = Convert.ToBase64String(memoryStream.ToArray());
             return $"data:image/png;base64,{base64Image}";
         }
         catch (PdfiumViewer.PdfException pdfEx)
         {
-            Debug.WriteLine($"PdfiumViewer.PdfException: {pdfEx.Message}");
+            Debug.WriteLine($"PdfiumViewer.PdfException in ConvertFileToImage: {pdfEx.Message}");
             Debug.WriteLine($"StackTrace: {pdfEx.StackTrace}");
             return $"Error: Invalid PDF format or corrupted: {pdfEx.Message}";
         }
