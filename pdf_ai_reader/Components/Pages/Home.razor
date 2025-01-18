@@ -12,22 +12,45 @@
 
 <InputFile OnChange="HandleFileSelected" accept=".pdf" />
 <input type="number" @bind="PageNumber" min="1" @bind:after="ProcessFile" /> / @TotalPages
-
+<button @onclick="@(() => ChangePage(-1))">Prev</button>
+<button @onclick="@(() => ChangePage(1))">Next</button>
 
 
 <br />
 
 @if (!string.IsNullOrEmpty(ImageData))
 {
-    <img src="@ImageData" alt="Converted Page Image" />
+    <img src="@(ImagePrefix + ImageData)" alt="Converted Page Image" />
+    <button @onclick="SendImage">Send Image</button>
+}
+@if (!string.IsNullOrEmpty(Response))
+{
+    <p>@Response</p>
 }
 
 @code {
     private IBrowserFile? UploadedFile;
     private int PageNumber = 1;
     private string? ImageData;
+    private string ImagePrefix = "data:image/png;base64,";
     private bool IsFileSelected => UploadedFile != null;
     private int TotalPages = 0;
+    private string? Response;
+
+
+    private async Task SendImage() {
+        if (!string.IsNullOrEmpty(ImageData)) { 
+            Response = await CommunicateWithGemini.GetTTSFriendlyText(ImageData, "image/png");
+        }
+
+    }
+
+    private async Task ChangePage(int increment)
+    {
+        PageNumber += increment;
+        PageNumber = Clamp(PageNumber, 0, TotalPages);
+        await ProcessFile();
+    }
 
     private async Task HandleFileSelected(InputFileChangeEventArgs e)
     {
@@ -72,11 +95,23 @@
         }
     }
 
+    private int Clamp(int n, int min, int max) { 
+        // Clamp logic for PageNumber
+        if (n > max)
+        {
+            n = max;
+        }
+        else if (n <= min)
+        {
+            n = 1;
+        }
+        return n;
 
+    }
 
     private async Task ProcessFile()
     {
-        
+
         if (UploadedFile == null)
         {
             Debug.WriteLine("No file uploaded.");
@@ -89,15 +124,9 @@
             return;
         }
 
-        // Clamp logic for PageNumber
-        if (PageNumber > TotalPages)
-        {
-            PageNumber = TotalPages;
-        }
-        else if (PageNumber <= 0)
-        {
-            PageNumber = 1;
-        }
+        PageNumber = Clamp(PageNumber, 0, TotalPages);
+
+        
 
         try
         {
@@ -133,7 +162,7 @@
             using var memoryStream = new MemoryStream();
             image.Save(memoryStream, ImageFormat.Png); // Ensure ImageFormat is accessible
             var base64Image = Convert.ToBase64String(memoryStream.ToArray());
-            return $"data:image/png;base64,{base64Image}";
+            return base64Image;
         }
         catch (PdfiumViewer.PdfException pdfEx)
         {
