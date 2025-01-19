@@ -11,7 +11,7 @@
     public class CommunicateWithGemini
     {
         // Replace with your actual Gemini API key
-        private const string ApiKey = "AIzaSyChMfiqVEJxPTUYMGQITrsDd8R8cU9s8mY";
+        private const string ApiKey = "";
         private const string GeminiApiEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent";
         private const string SystemInstruction = @"You are an expert in converting text, especially from scientific and mathematical documents (like PDFs), into a format suitable for text-to-speech (TTS) software. Your goal is to make the content accessible aurally by converting symbolic representations into spoken language.  Commas , must be pronounced as the word ""comma"" if it is important, for example in math statements, otherwise its fine. Only focus on how the words will be pronounced. Do not use parentheses. Use punctuation and several spaces as symbols to tell the TTS to pause. This is very important.
 
